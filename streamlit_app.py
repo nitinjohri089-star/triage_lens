@@ -37,6 +37,10 @@ st.info(
 
 with st.form("patient_features"):
     st.subheader("Patient measurements")
+    model_name = st.selectbox(
+        "Regression model",
+        options=["Logistic Regression", "Linear Regression"],
+    )
     col1, col2 = st.columns(2)
 
     with col1:
@@ -104,6 +108,7 @@ if submitted:
         "oxygen_saturation": oxygen_saturation,
         "pain_scale": pain_scale,
         "ambulance_arrival": ambulance_arrival,
+        "model": model_name,
     }
 
     try:
@@ -118,19 +123,26 @@ if submitted:
         st.error(f"Prediction request failed: {exc}")
     else:
         st.subheader("Model result")
-        st.metric("Predicted triage category", result["prediction"])
-        probabilities = pd.DataFrame(
-            [
-                {"Triage category": label, "Probability": probability}
-                for label, probability in result["probabilities"].items()
-            ]
-        ).sort_values("Probability", ascending=False)
-        st.bar_chart(
-            probabilities.set_index("Triage category"),
-            y="Probability",
-        )
-        st.dataframe(
-            probabilities.style.format({"Probability": "{:.1%}"}),
-            hide_index=True,
-            use_container_width=True,
-        )
+        st.metric("Predicted category", result["prediction"])
+        if result["model"] == "Logistic Regression":
+            probabilities = pd.DataFrame(
+                [
+                    {"Triage category": label, "Probability": probability}
+                    for label, probability in result["probabilities"].items()
+                ]
+            ).sort_values("Probability", ascending=False)
+            st.bar_chart(
+                probabilities.set_index("Triage category"),
+                y="Probability",
+            )
+            st.dataframe(
+                probabilities.style.format({"Probability": "{:.1%}"}),
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            st.metric("Linear regression raw score", f"{result['score']:.3f}")
+            st.caption(
+                "This score is not a probability. Scores at least 0.5 map to "
+                "Urgent; lower scores map to Non-Urgent."
+            )

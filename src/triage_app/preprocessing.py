@@ -22,15 +22,15 @@ REQUIRED_COLUMNS = [
 
 FEATURE_COLUMNS = REQUIRED_COLUMNS[:-1]
 
-TRIAGE_LABELS = {
-    1: "Immediate",
-    2: "Emergent",
-    3: "Urgent",
-    4: "Semi-Urgent",
-    5: "Non-Urgent",
+BINARY_TRIAGE_LABELS = {
+    1: 1,  # Immediate
+    2: 1,  # Emergent
+    3: 1,  # Urgent
+    4: 0,  # Semi-Urgent
+    5: 0,  # Non-Urgent
 }
-
-TRIAGE_ORDER = list(TRIAGE_LABELS.values())
+TRIAGE_NAMES = {0: "Non-Urgent", 1: "Urgent"}
+TRIAGE_ORDER = list(TRIAGE_NAMES)
 
 
 def load_and_clean_data(csv_path: str | Path) -> pd.DataFrame:
@@ -60,8 +60,8 @@ def load_and_clean_data(csv_path: str | Path) -> pd.DataFrame:
     # The source records temperature with an implied decimal place.
     data["TEMPF"] = data["TEMPF"] / 10
 
-    data = data[data["IMMEDR"].isin(TRIAGE_LABELS)].copy()
-    data["IMMEDR"] = data["IMMEDR"].map(TRIAGE_LABELS)
+    data = data[data["IMMEDR"].isin(BINARY_TRIAGE_LABELS)].copy()
+    data["IMMEDR"] = data["IMMEDR"].map(BINARY_TRIAGE_LABELS).astype(int)
     data["SEX"] = data["SEX"].map({1: "Female", 2: "Male"})
     data["ARREMS"] = data["ARREMS"].map({1: "Yes", 2: "No"})
 

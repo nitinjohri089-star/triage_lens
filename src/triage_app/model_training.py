@@ -1,16 +1,17 @@
-"""Build and train the triage classification models."""
+"""Build and train binary triage regression models."""
 
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.tree import DecisionTreeClassifier
 
 from .feature_engineering import create_preprocessor
 
 
+LINEAR_REGRESSION_THRESHOLD = 0.5
+
+
 def train_models(features, target, test_size=0.20, random_state=42):
-    """Split the data and fit all classifiers used by the notebook."""
+    """Train linear and logistic regression for the binary triage target."""
     x_train, x_test, y_train, y_test = train_test_split(
         features,
         target,
@@ -20,18 +21,7 @@ def train_models(features, target, test_size=0.20, random_state=42):
     )
 
     models = {
-        "Decision Tree": DecisionTreeClassifier(
-            max_depth=8,
-            random_state=random_state,
-            class_weight="balanced",
-        ),
-        "Random Forest": RandomForestClassifier(
-            n_estimators=200,
-            max_depth=12,
-            random_state=random_state,
-            class_weight="balanced",
-            n_jobs=-1,
-        ),
+        "Linear Regression": LinearRegression(),
         "Logistic Regression": LogisticRegression(
             max_iter=2000,
             class_weight="balanced",

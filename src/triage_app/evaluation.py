@@ -1,4 +1,4 @@
-"""Metrics and plots for trained triage classifiers."""
+"""Metrics and plots for the binary triage regression models."""
 
 from pathlib import Path
 
@@ -18,13 +18,24 @@ from sklearn.metrics import (
     recall_score,
 )
 
-from .preprocessing import TRIAGE_ORDER
+from .model_training import LINEAR_REGRESSION_THRESHOLD
+from .preprocessing import TRIAGE_NAMES, TRIAGE_ORDER
 
 
 def evaluate_models(models, x_test, y_test, output_dir: Path):
-    """Save metrics, diagnostic plots, and random-forest feature importance."""
+    """Save binary classification metrics and confusion matrices."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    predictions = {name: model.predict(x_test) for name, model in models.items()}
+    raw_predictions = {
+        name: model.predict(x_test) for name, model in models.items()
+    }
+    predictions = {
+        name: (
+            predicted >= LINEAR_REGRESSION_THRESHOLD
+        ).astype(int)
+        if name == "Linear Regression"
+        else predicted.astype(int)
+        for name, predicted in raw_predictions.items()
+    }
 
     results = []
     for name, predicted in predictions.items():
@@ -32,14 +43,14 @@ def evaluate_models(models, x_test, y_test, output_dir: Path):
             {
                 "Model": name,
                 "Accuracy": accuracy_score(y_test, predicted),
-                "Precision": precision_score(
-                    y_test, predicted, average="macro", zero_division=0
+                "Precision (Urgent)": precision_score(
+                    y_test, predicted, pos_label=1, zero_division=0
                 ),
-                "Recall": recall_score(
-                    y_test, predicted, average="macro", zero_division=0
+                "Recall (Urgent)": recall_score(
+                    y_test, predicted, pos_label=1, zero_division=0
                 ),
-                "F1 Score": f1_score(
-                    y_test, predicted, average="macro", zero_division=0
+                "F1 Score (Urgent)": f1_score(
+                    y_test, predicted, pos_label=1, zero_division=0
                 ),
             }
         )
@@ -50,8 +61,8 @@ def evaluate_models(models, x_test, y_test, output_dir: Path):
     print(results_df.round(4).to_string(index=False))
 
     results_df.set_index("Model").plot(kind="bar", figsize=(12, 6))
-    plt.title("Comparison of Machine Learning Algorithms")
-    plt.xlabel("Algorithms")
+    plt.title("Linear vs Logistic Regression")
+    plt.xlabel("Model")
     plt.ylabel("Performance Score")
     plt.ylim(0, 1)
     plt.xticks(rotation=0)
@@ -60,52 +71,35 @@ def evaluate_models(models, x_test, y_test, output_dir: Path):
     plt.savefig(output_dir / "model_comparison.png")
     plt.close()
 
-    rf_model = models["Random Forest"]
-    rf_predictions = predictions["Random Forest"]
-    confusion = confusion_matrix(y_test, rf_predictions, labels=TRIAGE_ORDER)
-    plt.figure(figsize=(9, 7))
-    sns.heatmap(
-        confusion,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        xticklabels=TRIAGE_ORDER,
-        yticklabels=TRIAGE_ORDER,
-    )
-    plt.title("Random Forest Confusion Matrix")
-    plt.xlabel("Predicted Category")
-    plt.ylabel("Actual Category")
-    plt.tight_layout()
-    plt.savefig(output_dir / "random_forest_confusion_matrix.png")
-    plt.close()
-
-    print("\nRandom Forest classification report:")
-    print(
-        classification_report(
-            y_test,
-            rf_predictions,
-            labels=TRIAGE_ORDER,
-            zero_division=0,
+    target_names = [TRIAGE_NAMES[label] for label in TRIAGE_ORDER]
+    for name, predicted in predictions.items():
+        confusion = confusion_matrix(y_test, predicted, labels=TRIAGE_ORDER)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(
+            confusion,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            xticklabels=target_names,
+            yticklabels=target_names,
         )
-    )
+        plt.title(f"{name} Confusion Matrix")
+        plt.xlabel("Predicted Category")
+        plt.ylabel("Actual Category")
+        plt.tight_layout()
+        filename = name.lower().replace(" ", "_")
+        plt.savefig(output_dir / f"{filename}_confusion_matrix.png")
+        plt.close()
 
-    preprocessor = rf_model.named_steps["preprocessor"]
-    classifier = rf_model.named_steps["classifier"]
-    importance_df = pd.DataFrame(
-        {
-            "Feature": preprocessor.get_feature_names_out(),
-            "Importance": classifier.feature_importances_,
-        }
-    ).sort_values("Importance", ascending=False)
-    importance_df.to_csv(output_dir / "feature_importance.csv", index=False)
-
-    plt.figure(figsize=(11, 7))
-    sns.barplot(data=importance_df, x="Importance", y="Feature")
-    plt.title("Random Forest Feature Importance")
-    plt.xlabel("Importance Score")
-    plt.ylabel("Features")
-    plt.tight_layout()
-    plt.savefig(output_dir / "random_forest_feature_importance.png")
-    plt.close()
+        print(f"\n{name} classification report:")
+        print(
+            classification_report(
+                y_test,
+                predicted,
+                labels=TRIAGE_ORDER,
+                target_names=target_names,
+                zero_division=0,
+            )
+        )
 
     return results_df, predictions
